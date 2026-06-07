@@ -1,0 +1,23 @@
+{
+  "routes": [
+    {
+      "route": "/api/chat",
+      "methods": ["POST"],
+      "allowedRoles": ["anonymous"]
+    }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/api/*", "/*.{glb,png,svg,ico,js,css,map,json,wasm,bin}"]
+  },
+  "mimeTypes": {
+    ".glb": "model/gltf-binary"
+  },
+  "globalHeaders": {
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff"
+  },
+  "responseOverrides": {
+    "404": { "rewrite": "/index.html" }
+  }
+}

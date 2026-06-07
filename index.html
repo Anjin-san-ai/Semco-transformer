@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Semco Digital Twin — Cognizant</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230033A0'/%3E%3Ctext x='8' y='12' font-family='Arial,sans-serif' font-size='10' font-weight='700' text-anchor='middle' fill='white'%3ES%3C/text%3E%3C/svg%3E" />
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-app:        #0a0f1e;
+      --bg-panel:      #0d1320;
+      --bg-card:       #1e2a3a;
+      --accent:        #0033A0;     /* Cognizant brand */
+      --accent-bright: #2b6bff;     /* digital highlight */
+      --accent-glow:   #7aa6ff;
+      --text:          #e7ecf3;
+      --text-dim:      #8896ad;
+      --border:        #1f2a40;
+      --warn:          #f5a524;
+      --ok:            #22c55e;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+      overflow: hidden;
+      background:
+        radial-gradient(1200px 700px at 30% 25%, rgba(43, 107, 255, 0.10), transparent 60%),
+        radial-gradient(900px 600px at 80% 90%, rgba(0, 51, 160, 0.10), transparent 65%),
+        var(--bg-app);
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: 56px 1fr;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 20px;
+      background: var(--bg-app);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-chip {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      height: 40px;
+    }
+    .logo-chip img {
+      height: 24px;
+      display: block;
+    }
+
+    .app-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text);
+    }
+    .app-title .sub {
+      color: var(--text-dim);
+      font-weight: 400;
+      margin-left: 8px;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: 10% 65% 25%;
+      height: 100%;
+      width: 100%;
+      min-height: 0;
+    }
+
+    .panel {
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .panel-left {
+      background:
+        linear-gradient(180deg, rgba(43, 107, 255, 0.04), transparent 30%),
+        var(--bg-panel);
+      border-right: 1px solid var(--border);
+      padding: 16px;
+    }
+    .panel-center {
+      background: transparent;
+    }
+    .panel-right {
+      background:
+        linear-gradient(180deg, rgba(43, 107, 255, 0.04), transparent 30%),
+        var(--bg-panel);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-heading {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-dim);
+      margin: 0 0 14px 0;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-heading::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 12px;
+      border-radius: 2px;
+      background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+      box-shadow: 0 0 8px rgba(43, 107, 255, 0.55);
+    }
+
+    /* Center 3D canvas */
+    #three-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Placeholder styling — replaced in later phases */
+    .placeholder {
+      color: var(--text-dim);
+      font-size: 13px;
+      padding: 12px;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+    }
+
+    /* Loading overlay over the 3D canvas */
+    .loading-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      background: rgba(10, 15, 30, 0.85);
+      color: var(--text);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      z-index: 5;
+      transition: opacity 300ms ease;
+    }
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.12);
+      border-top-color: #4d8bff;
+      animation: spin 0.9s linear infinite;
+    }
+    .loading-progress {
+      color: var(--text-dim);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---------- Phase 4: Agent network (compact neon graph) ---------- */
+    .panel-left { display: flex; flex-direction: column; }
+    .agent-network {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 0;
+    }
+    .agent-svg {
+      width: 100%;
+      height: 100%;
+      max-width: 280px;
+      max-height: 360px;
+      display: block;
+      margin: 0 auto;
+    }
+
+    /* Edges: faint by default, glowing neon when active */
+    .agent-edge line {
+      stroke: rgba(150, 180, 255, 0.10);
+      stroke-width: 1;
+      transition: stroke 320ms ease, stroke-width 320ms ease;
+    }
+    .agent-edge .edge-dot {
+      fill: rgba(150, 180, 255, 0.22);
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: fill 320ms ease;
+    }
+    .agent-edge.active line {
+      stroke: rgba(120, 170, 255, 0.95);
+      stroke-width: 1.6;
+      filter: drop-shadow(0 0 4px rgba(120, 170, 255, 0.65));
+    }
+    .agent-edge.active .edge-dot {
+      fill: #cfdfff;
+      filter: drop-shadow(0 0 3px rgba(180, 210, 255, 0.9));
+      animation: edge-dot-pulse 900ms ease-in-out infinite;
+    }
+    @keyframes edge-dot-pulse {
+      0%, 100% { transform: scale(1);   opacity: 0.85; }
+      50%      { transform: scale(1.9); opacity: 1; }
+    }
+
+    /* Nodes: small circles, breathing pulse when idle, glow when active */
+    .agent-node {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: agent-idle 4.4s ease-in-out infinite;
+    }
+    .agent-node[data-id="sensor_query"]      { animation-delay: 0s;    }
+    .agent-node[data-id="anomaly_detection"] { animation-delay: 0.9s;  }
+    .agent-node[data-id="engineering"]       { animation-delay: 1.8s;  }
+    .agent-node[data-id="maintenance"]       { animation-delay: 2.7s;  }
+    .agent-node[data-id="orchestrator"]      { animation-delay: 0.45s; }
+    @keyframes agent-idle {
+      0%, 100% { opacity: 0.78; }
+      50%      { opacity: 1; }
+    }
+
+    .agent-node circle {
+      fill: var(--bg-card);
+      stroke: rgba(150, 180, 255, 0.28);
+      stroke-width: 1.2;
+      transition: fill 280ms ease, stroke 280ms ease, filter 280ms ease;
+    }
+    .agent-node .node-label {
+      fill: var(--text);
+      font-size: 9px;
+      font-weight: 600;
+      font-family: inherit;
+      pointer-events: none;
+      transition: fill 280ms ease;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .agent-node .node-glyph {
+      fill: var(--accent-glow);
+      font-size: 8.5px;
+      font-weight: 700;
+      pointer-events: none;
+      letter-spacing: 0.08em;
+      opacity: 0.85;
+    }
+    .agent-node.active {
+      animation: agent-pulse 1100ms ease-in-out infinite;
+    }
+    .agent-node.active circle {
+      fill: var(--accent-bright);
+      stroke: #cfe1ff;
+      stroke-width: 2;
+      filter: drop-shadow(0 0 7px rgba(120, 170, 255, 0.9))
+              drop-shadow(0 0 16px rgba(120, 170, 255, 0.5));
+    }
+    .agent-node.active .node-label { fill: #ffffff; }
+    .agent-node.active .node-glyph { fill: #ffffff; opacity: 1; }
+    @keyframes agent-pulse {
+      0%, 100% { transform: scale(1); }
+      50%      { transform: scale(1.08); }
+    }
+
+    /* ---------- Phase 3: Hotspot tooltip ---------- */
+    #three-canvas { cursor: default; }
+    .hotspot-tooltip {
+      position: fixed;
+      pointer-events: none;
+      transform: translate(0, -100%);
+      background: rgba(13, 19, 32, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-width: 180px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.4;
+      opacity: 0;
+      transition: opacity 120ms ease;
+      z-index: 10;
+    }
+    .hotspot-tooltip.visible { opacity: 1; }
+    .hotspot-tooltip .t-name {
+      font-weight: 600;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+    .hotspot-tooltip .t-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--text-dim);
+    }
+    .hotspot-tooltip .t-val {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .hotspot-tooltip .t-status { margin-top: 8px; }
+    .hotspot-tooltip .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+    .hotspot-tooltip .badge.ok   { background: rgba(34, 197, 94, 0.18);  color: #4ade80; }
+    .hotspot-tooltip .badge.warn { background: rgba(245, 165, 36, 0.18); color: #fbbf24; }
+
+    /* ---------- Phase 6: Voice-input scaffold (standalone, pre-Phase-5) ---------- */
+    .chat-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 16px;
+      gap: 12px;
+    }
+    .chat-note {
+      color: var(--text-dim);
+      font-size: 11px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .chat-transcript {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .transcript-empty {
+      color: var(--text-dim);
+      font-size: 12px;
+      font-style: italic;
+      line-height: 1.5;
+    }
+    .transcript-line {
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--text);
+      background: var(--bg-card);
+      padding: 8px 10px;
+      border-radius: 6px;
+      word-wrap: break-word;
+    }
+    .transcript-line .ts {
+      display: block;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-bottom: 3px;
+      letter-spacing: 0.04em;
+    }
+    .transcript-line.interim {
+      color: var(--text-dim);
+      font-style: italic;
+      background: transparent;
+      border: 1px dashed var(--border);
+    }
+
+    .chat-inputbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #chat-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      font: inherit;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 150ms ease, box-shadow 150ms ease;
+    }
+    #chat-input:focus {
+      border-color: var(--accent-bright);
+      box-shadow: 0 0 0 3px rgba(43, 107, 255, 0.18);
+    }
+
+    .mic-btn {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 150ms ease, border-color 150ms ease;
+    }
+    .mic-btn:hover:not(:disabled) {
+      border-color: var(--accent-bright);
+      box-shadow: 0 0 0 3px rgba(43, 107, 255, 0.15);
+    }
+    .mic-btn:disabled { cursor: not-allowed; opacity: 0.4; }
+    .mic-btn svg { width: 18px; height: 18px; display: block; }
+    .mic-btn .mic-dot {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      opacity: 0;
+      transform: scale(0.6);
+      transition: opacity 120ms ease, transform 120ms ease;
+    }
+    .mic-btn.recording {
+      background: rgba(239, 68, 68, 0.18);
+      border-color: #ef4444;
+    }
+    .mic-btn.recording .mic-dot {
+      opacity: 1;
+      transform: scale(1);
+      animation: mic-pulse 1s ease-in-out infinite;
+    }
+    @keyframes mic-pulse {
+      0%, 100% { opacity: 1;   transform: scale(1);   }
+      50%      { opacity: 0.5; transform: scale(0.7); }
+    }
+    .speech-status {
+      min-height: 16px;
+      font-size: 11px;
+      color: var(--text-dim);
+      letter-spacing: 0.02em;
+    }
+    .speech-status.error  { color: var(--warn); }
+    .speech-status.active { color: #ef4444; }
+
+    /* ---------- Phase 5: Chat bubbles, send button, API-key modal ---------- */
+    .cm-bubble {
+      max-width: 88%;
+      padding: 10px 13px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: anywhere;
+      animation: cm-in 180ms ease-out;
+    }
+    @keyframes cm-in {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .cm-user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--accent-bright), var(--accent));
+      color: #ffffff;
+      border-bottom-right-radius: 3px;
+      box-shadow: 0 4px 14px rgba(43, 107, 255, 0.25);
+    }
+    .cm-ai {
+      align-self: flex-start;
+      background: var(--bg-card);
+      color: var(--text);
+      border-bottom-left-radius: 3px;
+    }
+    .cm-streaming::after {
+      content: '▋';
+      display: inline-block;
+      margin-left: 2px;
+      color: #4d8bff;
+      animation: cm-blink 0.9s steps(2) infinite;
+    }
+    @keyframes cm-blink { 50% { opacity: 0; } }
+    .cm-error {
+      background: rgba(220, 38, 38, 0.14);
+      border: 1px solid rgba(220, 38, 38, 0.4);
+      color: #fca5a5;
+      font-size: 12px;
+    }
+
+    /* Send button — same footprint as the mic so the input bar stays even */
+    .send-btn {
+      position: relative;
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      border-radius: 50%;
+      border: 1px solid var(--accent-bright);
+      background: linear-gradient(135deg, var(--accent-bright), var(--accent));
+      color: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: filter 150ms ease, transform 80ms ease, box-shadow 150ms ease;
+      box-shadow: 0 2px 10px rgba(43, 107, 255, 0.30);
+    }
+    .send-btn:hover:not(:disabled) {
+      filter: brightness(1.15);
+      box-shadow: 0 4px 16px rgba(43, 107, 255, 0.45);
+    }
+    .send-btn:active:not(:disabled) { transform: scale(0.94); }
+    .send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .send-btn svg { width: 16px; height: 16px; display: block; }
+
+    /* API-key modal */
+    .apikey-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 16, 0.78);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 180ms ease;
+    }
+    .apikey-modal.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .apikey-card {
+      width: min(440px, calc(100vw - 32px));
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    }
+    .apikey-card .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .apikey-card .logo-row .logo-chip { height: 34px; padding: 4px 10px; }
+    .apikey-card .logo-row .logo-chip img { height: 22px; }
+    .apikey-card h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .apikey-card p {
+      margin: 0 0 14px 0;
+      font-size: 12.5px;
+      line-height: 1.5;
+      color: var(--text-dim);
+    }
+    .apikey-input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      outline: none;
+    }
+    .apikey-input:focus { border-color: var(--accent); }
+    .apikey-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .apikey-submit {
+      padding: 9px 16px;
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .apikey-submit:hover { background: #0040c0; }
+    .apikey-error {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #fca5a5;
+      min-height: 1em;
+    }
+    .apikey-note {
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <header class="app-header">
+      <div class="logo-chip">
+        <img src="./Cognizantlogo.png" alt="Cognizant" />
+      </div>
+      <h1 class="app-title">
+        Semco Digital Twin
+        <span class="sub">— Offshore Substation Transformer</span>
+      </h1>
+    </header>
+
+    <main class="app-grid">
+
+      <aside class="panel panel-left">
+        <h2 class="panel-heading">Agent Network</h2>
+        <div class="agent-network">
+          <svg class="agent-svg" viewBox="0 0 220 360" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+            <!-- Edges (drawn behind nodes). Pair attrs are matched in either order. -->
+            <g class="agent-edge" data-from="orchestrator" data-to="sensor_query">
+              <line x1="96"  y1="155.8" x2="64"    y2="100.6" />
+              <circle class="edge-dot" cx="84.8" cy="136.5" r="2.1" />
+              <circle class="edge-dot" cx="75.2" cy="119.9" r="2.1" />
+            </g>
+            <g class="agent-edge" data-from="orchestrator" data-to="anomaly_detection">
+              <line x1="124" y1="155.8" x2="156"   y2="100.6" />
+              <circle class="edge-dot" cx="135.2" cy="136.5" r="2.1" />
+              <circle class="edge-dot" cx="144.8" cy="119.9" r="2.1" />
+            </g>
+            <g class="agent-edge" data-from="orchestrator" data-to="engineering">
+              <line x1="124" y1="204.2" x2="156"   y2="259.4" />
+              <circle class="edge-dot" cx="135.2" cy="223.5" r="2.1" />
+              <circle class="edge-dot" cx="144.8" cy="240.1" r="2.1" />
+            </g>
+            <g class="agent-edge" data-from="orchestrator" data-to="maintenance">
+              <line x1="96"  y1="204.2" x2="64"    y2="259.4" />
+              <circle class="edge-dot" cx="84.8" cy="223.5" r="2.1" />
+              <circle class="edge-dot" cx="75.2" cy="240.1" r="2.1" />
+            </g>
+            <g class="agent-edge" data-from="sensor_query" data-to="anomaly_detection">
+              <line x1="73"  y1="85" x2="147" y2="85" />
+              <circle class="edge-dot" cx="99"  cy="85" r="2.1" />
+              <circle class="edge-dot" cx="121" cy="85" r="2.1" />
+            </g>
+            <g class="agent-edge" data-from="anomaly_detection" data-to="engineering">
+              <line x1="165" y1="103" x2="165" y2="257" />
+              <circle class="edge-dot" cx="165" cy="156.9" r="2.1" />
+              <circle class="edge-dot" cx="165" cy="203.1" r="2.1" />
+            </g>
+            <g class="agent-edge" data-from="engineering" data-to="maintenance">
+              <line x1="147" y1="275" x2="73"  y2="275" />
+              <circle class="edge-dot" cx="121" cy="275" r="2.1" />
+              <circle class="edge-dot" cx="99"  cy="275" r="2.1" />
+            </g>
+            <g class="agent-edge" data-from="maintenance" data-to="sensor_query">
+              <line x1="55" y1="257" x2="55"  y2="103" />
+              <circle class="edge-dot" cx="55" cy="203.1" r="2.1" />
+              <circle class="edge-dot" cx="55" cy="156.9" r="2.1" />
+            </g>
+
+            <!-- Nodes: small circles with a 2-letter glyph inside and a label outside -->
+            <g class="agent-node" data-id="orchestrator">
+              <circle cx="110" cy="180" r="28" />
+              <text class="node-glyph" x="110" y="183" text-anchor="middle">ORCH</text>
+              <text class="node-label" x="110" y="225" text-anchor="middle">Orchestrator</text>
+            </g>
+            <g class="agent-node" data-id="sensor_query">
+              <circle cx="55" cy="85" r="18" />
+              <text class="node-glyph" x="55" y="88" text-anchor="middle">SQ</text>
+              <text class="node-label" x="55" y="50" text-anchor="middle">Sensor Query</text>
+            </g>
+            <g class="agent-node" data-id="anomaly_detection">
+              <circle cx="165" cy="85" r="18" />
+              <text class="node-glyph" x="165" y="88" text-anchor="middle">AD</text>
+              <text class="node-label" x="165" y="50" text-anchor="middle">Anomaly Detect</text>
+            </g>
+            <g class="agent-node" data-id="engineering">
+              <circle cx="165" cy="275" r="18" />
+              <text class="node-glyph" x="165" y="278" text-anchor="middle">ENG</text>
+              <text class="node-label" x="165" y="310" text-anchor="middle">Engineering</text>
+            </g>
+            <g class="agent-node" data-id="maintenance">
+              <circle cx="55" cy="275" r="18" />
+              <text class="node-glyph" x="55" y="278" text-anchor="middle">MTN</text>
+              <text class="node-label" x="55" y="310" text-anchor="middle">Maintenance</text>
+            </g>
+          </svg>
+        </div>
+      </aside>
+
+      <section class="panel panel-center">
+        <canvas id="three-canvas"></canvas>
+        <div id="loading-overlay" class="loading-overlay">
+          <div class="loading-spinner"></div>
+          <div>Loading substation model…</div>
+          <div id="loading-progress" class="loading-progress">0%</div>
+        </div>
+        <div id="hotspot-tooltip" class="hotspot-tooltip" role="tooltip" aria-hidden="true"></div>
+      </section>
+
+      <aside class="panel panel-right">
+        <div class="chat-shell">
+          <div>
+            <h2 class="panel-heading">Conversation</h2>
+          </div>
+          <div id="chat-transcript" class="chat-transcript" aria-live="polite"></div>
+          <div class="chat-inputbar">
+            <input type="text" id="chat-input" placeholder="Ask about the transformer…" autocomplete="off" />
+            <button type="button" id="send-button" class="send-btn" aria-label="Send message" title="Send">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+            <button type="button" id="mic-button" class="mic-btn" aria-label="Start voice input" aria-pressed="false" title="Voice input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="3" width="6" height="11" rx="3"></rect>
+                <path d="M5 11a7 7 0 0 0 14 0"></path>
+                <line x1="12" y1="18" x2="12" y2="22"></line>
+                <line x1="8"  y1="22" x2="16" y2="22"></line>
+              </svg>
+              <span class="mic-dot" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div id="speech-status" class="speech-status" role="status" aria-live="polite"></div>
+        </div>
+      </aside>
+
+    </main>
+
+  </div>
+
+  <!-- Phase 5: API-key modal (sessionStorage only, never persisted) -->
+  <div id="apikey-modal" class="apikey-modal hidden" role="dialog" aria-modal="true" aria-labelledby="apikey-title">
+    <div class="apikey-card">
+      <div class="logo-row">
+        <div class="logo-chip"><img src="./Cognizantlogo.png" alt="Cognizant" /></div>
+        <h3 id="apikey-title">Anthropic API key required</h3>
+      </div>
+      <p>Paste your Anthropic API key to enable the chat. The key is held in <code>sessionStorage</code> only — it is never logged, transmitted to any other server, or persisted across browser sessions.</p>
+      <input type="password" id="apikey-input" class="apikey-input" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+      <div id="apikey-error" class="apikey-error"></div>
+      <div class="apikey-actions">
+        <button type="button" id="apikey-submit" class="apikey-submit">Save &amp; continue</button>
+      </div>
+      <div class="apikey-note">For demo use only. Cognizant SSO is the Phase 2 production path (spec §9).</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader }    from 'three/addons/loaders/GLTFLoader.js';
+
+    // ---- Phase 4: Agent network --------------------------------------------
+    const AGENT_IDS = ['orchestrator', 'sensor_query', 'anomaly_detection', 'engineering', 'maintenance'];
+    const agentNodes = Object.fromEntries(
+      AGENT_IDS.map(id => [id, document.querySelector(`.agent-node[data-id="${id}"]`)])
+    );
+    let agentTimers = [];
+
+    function findEdge(a, b) {
+      return document.querySelector(
+        `.agent-edge[data-from="${a}"][data-to="${b}"], .agent-edge[data-from="${b}"][data-to="${a}"]`
+      );
+    }
+
+    function clearActiveAgents() {
+      agentTimers.forEach(clearTimeout);
+      agentTimers = [];
+      AGENT_IDS.forEach(id => agentNodes[id]?.classList.remove('active'));
+      document.querySelectorAll('.agent-edge.active').forEach(el => el.classList.remove('active'));
+    }
+
+    function fireAgentSequence(agentList) {
+      clearActiveAgents();
+      const stepGap = 600;
+      const holdMs  = 4000;
+      agentList.forEach((id, i) => {
+        const node = agentNodes[id];
+        if (!node) { console.warn('[agent-net] unknown agent id:', id); return; }
+        agentTimers.push(setTimeout(() => {
+          node.classList.add('active');
+          if (i > 0) {
+            const edge = findEdge(agentList[i - 1], id);
+            if (edge) edge.classList.add('active');
+          }
+        }, i * stepGap));
+      });
+      const fadeAt = (agentList.length - 1) * stepGap + holdMs;
+      agentTimers.push(setTimeout(clearActiveAgents, fadeAt));
+    }
+
+    // Expose for Phase 5 (chat → keyword routing) and dev console testing.
+    window.fireAgentSequence = fireAgentSequence;
+
+    // ---- Phase 3: Hotspots (spec §5.3 / §5.4) -------------------------------
+    // Component data hardcoded verbatim from spec §5.3. Positions are
+    // calibrated against the procedural fallback; on the real BIM model
+    // they will be off and need re-anchoring in Phase 7.
+    const components = {
+      bushing_A:    { label: "Bushing A",    vibration: 2.1, temp: 68, status: "healthy",  position: [0.5,  1.8,  0]   },
+      bushing_B:    { label: "Bushing B",    vibration: 7.8, temp: 91, status: "warning",  position: [0,    1.8,  0]   },
+      bushing_C:    { label: "Bushing C",    vibration: 3.2, temp: 72, status: "healthy",  position: [-0.5, 1.8,  0]   },
+      main_coil:    { label: "Main Coil",    vibration: 5.4, temp: 84, status: "warning",  position: [0,    0.2,  0]   },
+      cooling_tank: { label: "Cooling Tank", vibration: 1.2, temp: 55, status: "healthy",  position: [1.2,  0,    0]   }
+    };
+
+    const hotspots = [];
+    const tooltipEl = document.getElementById('hotspot-tooltip');
+
+    function makeHotspotTexture(fill, ring) {
+      const size = 128;
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      // Soft outer glow
+      const grad = ctx.createRadialGradient(size/2, size/2, size*0.15, size/2, size/2, size*0.5);
+      grad.addColorStop(0,   fill + 'cc');
+      grad.addColorStop(0.5, fill + '55');
+      grad.addColorStop(1,   fill + '00');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+      // Solid core + ring
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size*0.28, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = size * 0.06;
+      ctx.strokeStyle = ring;
+      ctx.stroke();
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    const HOTSPOT_TEX = {
+      healthy: makeHotspotTexture('#22c55e', '#bdf5cb'),
+      warning: makeHotspotTexture('#f5a524', '#ffe6a3')
+    };
+
+    function createHotspots(parent) {
+      // Clean prior hotspots in case the model reloads
+      hotspots.splice(0).forEach(s => s.parent && s.parent.remove(s));
+
+      const maxSize = (window.__modelBounds && window.__modelBounds.maxSize) || 3;
+      // Spec radii (~0.06 healthy, ~0.1 warning) are calibrated against the
+      // procedural box (maxSize ≈ 3). Scale relative to model size so the
+      // hotspots remain readable on the BIM-scale GLB too.
+      const baseHealthy = maxSize * 0.020;
+      const baseWarning = maxSize * 0.033;
+
+      for (const [key, c] of Object.entries(components)) {
+        const tex  = HOTSPOT_TEX[c.status] || HOTSPOT_TEX.healthy;
+        const mat  = new THREE.SpriteMaterial({
+          map: tex,
+          transparent: true,
+          depthTest: false,   // float over the mesh so they're never occluded
+          depthWrite: false
+        });
+        const sprite = new THREE.Sprite(mat);
+        sprite.position.set(c.position[0], c.position[1], c.position[2]);
+        const base = c.status === 'warning' ? baseWarning : baseHealthy;
+        sprite.scale.setScalar(base);
+        sprite.renderOrder = 999;
+        sprite.userData = { key, base, pulseUntil: 0, ...c };
+        parent.add(sprite);
+        hotspots.push(sprite);
+      }
+    }
+
+    // Picking + hover state
+    const raycaster = new THREE.Raycaster();
+    const pointer   = new THREE.Vector2();
+    let hoveredHotspot = null;
+    const _worldPos = new THREE.Vector3();
+
+    function updatePointer(e) {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width)  *  2 - 1;
+      pointer.y = ((e.clientY - rect.top)  / rect.height) * -2 + 1;
+    }
+
+    function pickHotspot() {
+      if (hotspots.length === 0) return null;
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(hotspots, false);
+      return hits.length ? hits[0].object : null;
+    }
+
+    function showTooltip(sprite) {
+      const d = sprite.userData;
+      const badge = d.status === 'warning'
+        ? '<span class="badge warn">WARNING</span>'
+        : '<span class="badge ok">HEALTHY</span>';
+      tooltipEl.innerHTML =
+        `<div class="t-name">${d.label}</div>` +
+        `<div class="t-row"><span>Vibration</span><span class="t-val">${d.vibration} mm/s</span></div>` +
+        `<div class="t-row"><span>Temperature</span><span class="t-val">${d.temp} °C</span></div>` +
+        `<div class="t-status">${badge}</div>`;
+      tooltipEl.classList.add('visible');
+      tooltipEl.setAttribute('aria-hidden', 'false');
+      positionTooltip(sprite);
+    }
+
+    function hideTooltip() {
+      tooltipEl.classList.remove('visible');
+      tooltipEl.setAttribute('aria-hidden', 'true');
+    }
+
+    function positionTooltip(sprite) {
+      sprite.getWorldPosition(_worldPos);
+      _worldPos.project(camera);
+      const rect = canvas.getBoundingClientRect();
+      const x = (_worldPos.x *  0.5 + 0.5) * rect.width  + rect.left;
+      const y = (_worldPos.y * -0.5 + 0.5) * rect.height + rect.top;
+      tooltipEl.style.left = (x + 14) + 'px';
+      tooltipEl.style.top  = (y - 14) + 'px';
+    }
+
+    function onPointerMove(e) {
+      updatePointer(e);
+      const hit = pickHotspot();
+      if (hit) {
+        hoveredHotspot = hit;
+        canvas.style.cursor = 'pointer';
+        showTooltip(hit);
+      } else if (hoveredHotspot) {
+        hoveredHotspot = null;
+        canvas.style.cursor = '';
+        hideTooltip();
+      }
+    }
+
+    function onPointerLeave() {
+      hoveredHotspot = null;
+      canvas.style.cursor = '';
+      hideTooltip();
+    }
+
+    function onClick(e) {
+      updatePointer(e);
+      const hit = pickHotspot();
+      if (!hit) return;
+      const label = hit.userData.label;
+      if (typeof window.sendChatMessage === 'function') {
+        window.sendChatMessage(`Tell me about ${label}`);
+      }
+    }
+
+    // Listener registration is deferred to bindHotspotEvents(), called from
+    // scene setup once `canvas` exists. Doing it here would hit the TDZ since
+    // `const canvas` is declared further down in the module.
+    function bindHotspotEvents(canvasEl) {
+      canvasEl.addEventListener('mousemove', onPointerMove);
+      canvasEl.addEventListener('mouseleave', onPointerLeave);
+      canvasEl.addEventListener('click', onClick);
+    }
+
+    function animateHotspots(t) {
+      if (hotspots.length === 0) return;
+      const now = performance.now();
+      for (const s of hotspots) {
+        let scale = s.userData.base;
+        if (s.userData.status === 'warning') {
+          scale *= 1 + Math.sin(t * 3) * 0.12; // gentle pulse on warnings
+        }
+        if (now < s.userData.pulseUntil) {
+          scale *= 1.5; // forced highlight pulse (spec §6.6)
+        }
+        s.scale.setScalar(scale);
+      }
+      if (hoveredHotspot) positionTooltip(hoveredHotspot);
+    }
+
+    // Phase 5 will replace this with the real chat send. Stub keeps Phase 3
+    // standalone testable: clicks just log to the console.
+    if (typeof window.sendChatMessage !== 'function') {
+      window.sendChatMessage = (text) => console.log('[semco-twin] sendChatMessage(stub):', text);
+    }
+
+    // Phase 5 wiring point: pulse a hotspot when its component is mentioned.
+    window.pulseHotspot = function (key) {
+      const s = hotspots.find(h => h.userData.key === key);
+      if (s) s.userData.pulseUntil = performance.now() + 2000;
+    };
+
+    // ---- Scene setup ---------------------------------------------------------
+    const canvas   = document.getElementById('three-canvas');
+    const overlay  = document.getElementById('loading-overlay');
+    const progress = document.getElementById('loading-progress');
+
+    // Phase 3 hotspot listeners — wired here so they pick up the just-declared
+    // `canvas` const without tripping the temporal dead zone.
+    bindHotspotEvents(canvas);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0f1e);
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 5000);
+    camera.position.set(3, 3, 5);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.3;
+
+    // Auto-rotate pause-on-interact, resume after 5s idle
+    let resumeTimer;
+    controls.addEventListener('start', () => {
+      controls.autoRotate = false;
+      clearTimeout(resumeTimer);
+    });
+    controls.addEventListener('end', () => {
+      clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => { controls.autoRotate = true; }, 5000);
+    });
+
+    // ---- Lighting ------------------------------------------------------------
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const keyLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    keyLight.position.set(5, 8, 6);
+    scene.add(keyLight);
+    const fillLight = new THREE.DirectionalLight(0x88aaff, 0.25);
+    fillLight.position.set(-5, 3, -4);
+    scene.add(fillLight);
+
+    // ---- Sizing --------------------------------------------------------------
+    function resize() {
+      const w = canvas.clientWidth || 1;
+      const h = canvas.clientHeight || 1;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ---- Fit camera to loaded model -----------------------------------------
+    function fitCameraToObject(object, offset = 1.6) {
+      const box    = new THREE.Box3().setFromObject(object);
+      const size   = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+
+      // Recenter the model on the origin
+      object.position.sub(center);
+
+      const maxSize  = Math.max(size.x, size.y, size.z);
+      const fov      = camera.fov * (Math.PI / 180);
+      const fitDist  = (maxSize / 2) / Math.tan(fov / 2);
+      const distance = fitDist * offset;
+
+      const dir = new THREE.Vector3(1, 0.7, 1.4).normalize();
+      camera.position.copy(dir.multiplyScalar(distance));
+      camera.near = Math.max(distance / 1000, 0.01);
+      camera.far  = distance * 100;
+      camera.updateProjectionMatrix();
+      camera.lookAt(0, 0, 0);
+
+      controls.target.set(0, 0, 0);
+      controls.maxDistance = distance * 4;
+      controls.minDistance = distance * 0.1;
+      controls.update();
+
+      // Expose model dimensions so later phases can rescale hotspots
+      window.__modelBounds = { size, maxSize, distance };
+    }
+
+    // ---- Procedural fallback (spec §5.2) ------------------------------------
+    function buildProceduralTransformer() {
+      const group = new THREE.Group();
+
+      const tankMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.6, metalness: 0.35 });
+      const tank = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 1.5), tankMat);
+      group.add(tank);
+
+      const bushingMat = new THREE.MeshStandardMaterial({ color: 0xeae3c8, roughness: 0.4 });
+      [-0.5, 0, 0.5].forEach(x => {
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.8, 24), bushingMat);
+        b.position.set(x, 1.9, 0);
+        group.add(b);
+      });
+
+      const radMat = new THREE.MeshStandardMaterial({ color: 0x394150, roughness: 0.7 });
+      const radiator = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 1.2), radMat);
+      radiator.position.set(1.16, 0, 0);
+      group.add(radiator);
+
+      const plinthMat = new THREE.MeshStandardMaterial({ color: 0x2a313d, roughness: 0.9 });
+      const plinth = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.2, 2.0), plinthMat);
+      plinth.position.set(0, -1.6, 0);
+      group.add(plinth);
+
+      scene.add(group);
+      window.__transformerRoot = group;
+      window.__isProcedural = true;
+      fitCameraToObject(group);
+      createHotspots(group);
+    }
+
+    // ---- GLB loader ----------------------------------------------------------
+    // Source: local file in dev, Azure Blob Storage in production. The blob
+    // URL is set after we provision the storage account post-deploy; until
+    // then production falls back to procedural via the load-error path below.
+    const GLB_URL_LOCAL = './transformer.glb';
+    const GLB_URL_REMOTE = ''; // filled in once Blob Storage container is live, e.g. 'https://<account>.blob.core.windows.net/twin/transformer.glb'
+    function loadGLB() {
+      const loader = new GLTFLoader();
+      const url = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+        ? GLB_URL_LOCAL
+        : (GLB_URL_REMOTE || GLB_URL_LOCAL);
+      loader.load(
+        url,
+        (gltf) => {
+          const root = gltf.scene;
+          scene.add(root);
+          window.__transformerRoot = root;
+          window.__isProcedural = false;
+          fitCameraToObject(root);
+          createHotspots(root);
+          hideOverlay();
+        },
+        (xhr) => {
+          if (xhr.lengthComputable) {
+            const pct = Math.floor((xhr.loaded / xhr.total) * 100);
+            progress.textContent = pct + '%';
+          } else {
+            progress.textContent = Math.floor(xhr.loaded / 1024 / 1024) + ' MB';
+          }
+        },
+        (err) => {
+          console.warn('[semco-twin] GLB load failed, using procedural fallback:', err);
+          buildProceduralTransformer();
+          hideOverlay();
+        }
+      );
+    }
+
+    function hideOverlay() {
+      overlay.classList.add('hidden');
+    }
+
+    // ---- Render loop ---------------------------------------------------------
+    const renderClock = new THREE.Clock();
+    function tick() {
+      const t = renderClock.getElapsedTime();
+      controls.update();
+      animateHotspots(t);
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    }
+    tick();
+
+    // Kick off load
+    loadGLB();
+
+    // ---- Phase 6: Voice input (press-to-talk) -------------------------------
+    // Click the mic to start recording; interim transcript shows in the input
+    // field. On final transcript, auto-send via sendChatMessage. Click again
+    // to stop. Degrades silently when the API is unavailable.
+    (function initVoiceInput() {
+      const micBtn   = document.getElementById('mic-button');
+      const inputEl  = document.getElementById('chat-input');
+      const statusEl = document.getElementById('speech-status');
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      function setStatus(msg, cls) {
+        statusEl.textContent = msg || '';
+        statusEl.className = 'speech-status' + (cls ? ' ' + cls : '');
+      }
+
+      if (!SR) {
+        micBtn.disabled = true;
+        micBtn.title = 'Voice input not supported in this browser';
+        micBtn.setAttribute('aria-label', 'Voice input not supported in this browser');
+        return;
+      }
+
+      const recognition = new SR();
+      recognition.lang            = 'en-US';
+      recognition.continuous      = false;
+      recognition.interimResults  = true;
+      recognition.maxAlternatives = 1;
+
+      let recording = false;
+
+      function handleTranscript(text) {
+        inputEl.value = text;
+        if (typeof window.sendChatMessage === 'function') {
+          try { window.sendChatMessage(text); } catch (e) { console.warn(e); }
+        }
+      }
+
+      function startRecording() {
+        if (recording) return;
+        try { recognition.start(); }
+        catch (e) { setStatus('Could not start microphone: ' + e.message, 'error'); }
+      }
+
+      function stopRecording() {
+        if (!recording) return;
+        try { recognition.stop(); } catch (_) {}
+      }
+
+      micBtn.addEventListener('click', () => {
+        if (recording) stopRecording(); else startRecording();
+      });
+
+      recognition.addEventListener('start', () => {
+        recording = true;
+        micBtn.classList.add('recording');
+        micBtn.setAttribute('aria-pressed', 'true');
+        micBtn.setAttribute('aria-label', 'Stop voice input');
+        setStatus('Listening…', 'active');
+      });
+
+      recognition.addEventListener('result', (event) => {
+        let interim = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const r = event.results[i];
+          if (r.isFinal) finalText += r[0].transcript;
+          else           interim   += r[0].transcript;
+        }
+        if (interim) inputEl.value = interim;
+        if (finalText) handleTranscript(finalText.trim());
+      });
+
+      recognition.addEventListener('error', (event) => {
+        const map = {
+          'no-speech':     'No speech detected — try again.',
+          'audio-capture': 'No microphone found.',
+          'not-allowed':   'Microphone access blocked. Allow it in browser settings.',
+          'aborted':       ''
+        };
+        const msg = map[event.error] != null ? map[event.error] : ('Speech error: ' + event.error);
+        if (msg) setStatus(msg, 'error'); else setStatus('');
+      });
+
+      recognition.addEventListener('end', () => {
+        recording = false;
+        micBtn.classList.remove('recording');
+        micBtn.setAttribute('aria-pressed', 'false');
+        micBtn.setAttribute('aria-label', 'Start voice input');
+        if (statusEl.classList.contains('active')) setStatus('');
+      });
+
+      window.__voiceInput = { recognition, start: startRecording, stop: stopRecording };
+    })();
+  </script>
+
+  <script type="module">
+    // ============================================================================
+    // Phase 5 — Chat UI, dual-mode streaming
+    // ----------------------------------------------------------------------------
+    // - Pre-seeded welcome message (spec §6.2)
+    // - sendChatMessage(text): renders the user bubble, runs keyword routing
+    //   (fires Phase 4 agent sequence), pulses Phase 3 hotspots for any mentioned
+    //   component, then streams from the chat API into a new AI bubble.
+    // - DUAL MODE:
+    //     * localhost / 127.0.0.1 → call Azure OpenAI directly with the
+    //       inline key (fast local-dev iteration; matches `python3 -m http.server`).
+    //     * everywhere else (deployed)  → call the Azure Function at /api/chat,
+    //       which holds the key as a server-side application setting.
+    //   The frontend SSE parser is identical for both — both speak OpenAI
+    //   chat-completions SSE.
+    // ============================================================================
+
+    // Local-dev direct path. NOT used in production (see USE_API_PROXY below).
+    // Key is fetched from sessionStorage at request time; if absent, the user
+    // is prompted once per browser tab. The key is never persisted to the repo.
+    const AZURE_ENDPOINT = 'https://54138-molqi33i-eastus2.services.ai.azure.com/openai/v1';
+    const LOCAL_KEY_STORAGE = 'azure_openai_key';
+    const MODEL_ID    = 'gpt-5.5';
+    const MAX_TOKENS  = 1024;
+
+    function getLocalAzureKey() {
+      let k = sessionStorage.getItem(LOCAL_KEY_STORAGE);
+      if (k) return k;
+      // eslint-disable-next-line no-alert
+      k = window.prompt(
+        'Local-dev mode: paste your Azure OpenAI API key.\n' +
+        '(Stored in sessionStorage for this tab only — never persisted.)'
+      );
+      if (k) {
+        sessionStorage.setItem(LOCAL_KEY_STORAGE, k.trim());
+        return k.trim();
+      }
+      return '';
+    }
+
+    // Use the function proxy whenever we are NOT on a local dev origin. This
+    // keeps `python3 -m http.server` working (with a sessionStorage key prompt)
+    // while deployments (HTTPS, .azurestaticapps.net, custom domains) all route
+    // through /api/chat with the server-side key.
+    const USE_API_PROXY = !(location.hostname === 'localhost'
+                         || location.hostname === '127.0.0.1'
+                         || location.hostname === '');
+
+    // Spec §6.3 — verbatim system prompt.
+    const SYSTEM_PROMPT = [
+      "You are a digital twin AI assistant for a Semco offshore substation transformer.",
+      "You have access to live sensor data from 5 components. Respond concisely in 2-4 sentences.",
+      "When asked about causes, explain likely engineering reasons for the sensor readings.",
+      "When asked about fixes, give 3-5 numbered steps a maintenance engineer can follow on-site.",
+      "When asked for predictions, give a timeframe and a confidence level (e.g. '85% confidence').",
+      "Always reference specific component names and sensor values in your answers.",
+      "",
+      "Current sensor data:",
+      "- Bushing A:    vibration 2.1 mm/s, temp 68 C  — healthy",
+      "- Bushing B:    vibration 7.8 mm/s, temp 91 C  — WARNING",
+      "- Bushing C:    vibration 3.2 mm/s, temp 72 C  — healthy",
+      "- Main Coil:    vibration 5.4 mm/s, temp 84 C  — WARNING",
+      "- Cooling Tank: vibration 1.2 mm/s, temp 55 C  — healthy"
+    ].join('\n');
+
+    // Spec §6.2 — verbatim welcome.
+    const WELCOME_MESSAGE =
+      "I'm monitoring 5 components on your Semco transformer. Bushing B and the Main Coil are showing elevated readings. " +
+      "Ask me anything — try 'What's causing the vibration spike?' or 'How do I fix Bushing B?'";
+
+    // Spec §4.3 — keyword → agent sequence. Order matters: the first matching
+    // row wins. The status/health/overview row also acts as the default for any
+    // message that doesn't hit one of the other tables.
+    const AGENT_ROUTES = [
+      { keywords: ['why', 'cause', 'sensor'],
+        agents: ['orchestrator', 'sensor_query', 'anomaly_detection', 'engineering'] },
+      { keywords: ['fix', 'repair', 'maintenance', 'steps'],
+        agents: ['orchestrator', 'sensor_query', 'maintenance'] },
+      { keywords: ['predict', 'forecast', 'when', 'fail'],
+        agents: ['orchestrator', 'anomaly_detection', 'engineering'] },
+      { keywords: ['status', 'health', 'overview'],
+        agents: ['orchestrator', 'sensor_query', 'anomaly_detection'] }
+    ];
+    const DEFAULT_AGENTS = ['orchestrator', 'sensor_query', 'anomaly_detection'];
+
+    // Component label → hotspot key. Pulled from spec §5.3. Phase 3 owns the
+    // canonical `components` object; this map mirrors only the labels so chat
+    // can detect mentions without depending on Phase 3 being loaded.
+    const COMPONENT_LABELS = [
+      ['bushing a',    'bushing_A'],
+      ['bushing b',    'bushing_B'],
+      ['bushing c',    'bushing_C'],
+      ['main coil',    'main_coil'],
+      ['cooling tank', 'cooling_tank']
+    ];
+
+    // ---- DOM refs ------------------------------------------------------------
+    const messagesEl  = document.getElementById('chat-transcript');
+    const inputEl     = document.getElementById('chat-input');
+    const sendBtn     = document.getElementById('send-button');
+    const modalEl     = document.getElementById('apikey-modal');
+    const modalInput  = document.getElementById('apikey-input');
+    const modalSubmit = document.getElementById('apikey-submit');
+    const modalError  = document.getElementById('apikey-error');
+
+    // ---- Conversation state --------------------------------------------------
+    // Only API-sent turns go in here. The welcome message is UI-only so the
+    // model doesn't think it said something it didn't.
+    const conversationHistory = [];
+    let streaming = false; // single-flight; second send while a response streams is rejected
+
+    // ---- API key handling ----------------------------------------------------
+    // Local override: key is hardcoded above, the modal is never shown. The
+    // modal markup is left in the DOM but hidden on init below.
+    function hideApiKeyModal() { modalEl.classList.add('hidden'); }
+
+    // ---- Bubble rendering ----------------------------------------------------
+    function appendBubble(kind, text) {
+      const el = document.createElement('div');
+      el.className = 'cm-bubble cm-' + kind;
+      el.textContent = text;
+      messagesEl.appendChild(el);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return el;
+    }
+
+    function appendErrorBubble(text) {
+      const el = appendBubble('ai', text);
+      el.classList.add('cm-error');
+      return el;
+    }
+
+    // ---- Keyword routing & component detection -----------------------------
+    function pickAgents(text) {
+      const lo = text.toLowerCase();
+      for (const route of AGENT_ROUTES) {
+        if (route.keywords.some(kw => lo.includes(kw))) return route.agents;
+      }
+      return DEFAULT_AGENTS;
+    }
+
+    function detectComponents(text) {
+      const lo = text.toLowerCase();
+      const hits = [];
+      for (const [label, key] of COMPONENT_LABELS) {
+        if (lo.includes(label)) hits.push(key);
+      }
+      return hits;
+    }
+
+    // ---- Streaming chat (dual-mode) -----------------------------------------
+    // Direct mode (localhost): hit Azure OpenAI with the inline key.
+    // Proxy mode (deployed):  POST to /api/chat; the Function holds the key.
+    // In both modes the response body is OpenAI-style SSE that the loop below
+    // parses identically:  data: {"choices":[{"delta":{"content":"..."}}]}
+    // ending with `data: [DONE]`. Empty content_filter chunks are skipped.
+    async function streamChat(messages, onTextDelta) {
+      let resp;
+      if (USE_API_PROXY) {
+        // Server appends the system prompt; we only send user/assistant turns.
+        resp = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages, max_completion_tokens: MAX_TOKENS })
+        });
+      } else {
+        const key = getLocalAzureKey();
+        if (!key) throw new Error('No Azure OpenAI key provided. Reload to retry.');
+        const payload = {
+          model: MODEL_ID,
+          max_completion_tokens: MAX_TOKENS,
+          stream: true,
+          messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages]
+        };
+        resp = await fetch(AZURE_ENDPOINT + '/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-key': key
+          },
+          body: JSON.stringify(payload)
+        });
+        // 401 → key was bad, clear it so the next attempt re-prompts.
+        if (resp.status === 401) sessionStorage.removeItem(LOCAL_KEY_STORAGE);
+      }
+
+      if (!resp.ok) {
+        let bodyText = '';
+        try { bodyText = await resp.text(); } catch (_) { /* ignore */ }
+        const err = new Error('HTTP ' + resp.status + (bodyText ? ': ' + bodyText.slice(0, 280) : ''));
+        err.status = resp.status;
+        throw err;
+      }
+      if (!resp.body) throw new Error('No response body to stream.');
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let sep;
+        while ((sep = buf.indexOf('\n\n')) !== -1) {
+          const frame = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          for (const line of frame.split('\n')) {
+            if (!line.startsWith('data:')) continue;
+            const payload = line.slice(5).trim();
+            if (!payload) continue;
+            if (payload === '[DONE]') return;
+            let obj;
+            try { obj = JSON.parse(payload); } catch (_) { continue; }
+            const choice = obj.choices && obj.choices[0];
+            const delta = choice && choice.delta && choice.delta.content;
+            if (typeof delta === 'string' && delta.length) onTextDelta(delta);
+          }
+        }
+      }
+    }
+
+    // ---- Main entry point ----------------------------------------------------
+    async function sendChatMessage(rawText) {
+      const text = (rawText || '').trim();
+      if (!text) return;
+      if (streaming) return; // ignore back-to-back sends while a stream is live
+
+      // 1. Render user bubble + push to history (spec §6.6 step 1)
+      appendBubble('user', text);
+      conversationHistory.push({ role: 'user', content: text });
+      inputEl.value = '';
+
+      // 3. Keyword routing → agent network animation (step 2)
+      const agents = pickAgents(text);
+      if (typeof window.fireAgentSequence === 'function') {
+        try { window.fireAgentSequence(agents); }
+        catch (e) { console.warn('[phase5] fireAgentSequence failed:', e); }
+      }
+
+      // 4. Component mention → hotspot pulse (step 3)
+      if (typeof window.pulseHotspot === 'function') {
+        for (const key of detectComponents(text)) {
+          try { window.pulseHotspot(key); }
+          catch (e) { console.warn('[phase5] pulseHotspot failed for', key, e); }
+        }
+      }
+
+      // 5. Stream the response (steps 4–5)
+      const aiBubble = appendBubble('ai', '');
+      aiBubble.classList.add('cm-streaming');
+      let accumulated = '';
+      streaming = true;
+      sendBtn.disabled = true;
+
+      try {
+        await streamChat(conversationHistory, (delta) => {
+          accumulated += delta;
+          aiBubble.textContent = accumulated;
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        });
+        aiBubble.classList.remove('cm-streaming');
+        if (accumulated) {
+          conversationHistory.push({ role: 'assistant', content: accumulated });
+        } else {
+          aiBubble.classList.add('cm-error');
+          aiBubble.textContent = '(empty response — try again)';
+        }
+      } catch (err) {
+        aiBubble.classList.remove('cm-streaming');
+        aiBubble.classList.add('cm-error');
+        const msg = (err && err.message) ? err.message : String(err);
+        aiBubble.textContent = '⚠ Request failed: ' + msg;
+        console.error('[phase5] streaming error:', err);
+
+        // Drop the dangling user turn so history stays consistent for the next send.
+        if (conversationHistory.length &&
+            conversationHistory[conversationHistory.length - 1].role === 'user') {
+          conversationHistory.pop();
+        }
+      } finally {
+        streaming = false;
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+    }
+
+    // Expose to Phase 3 (hotspot click) and Phase 6 (voice handler).
+    window.sendChatMessage = sendChatMessage;
+
+    // ---- Wire input controls ------------------------------------------------
+    sendBtn.addEventListener('click', () => sendChatMessage(inputEl.value));
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage(inputEl.value);
+      }
+    });
+
+    // ---- Initial render -----------------------------------------------------
+    appendBubble('ai', WELCOME_MESSAGE);
+    hideApiKeyModal();
+  </script>
+</body>
+</html>

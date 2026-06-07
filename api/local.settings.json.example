@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AZURE_OPENAI_KEY": "PASTE-YOUR-KEY-HERE",
+    "AZURE_OPENAI_ENDPOINT": "https://54138-molqi33i-eastus2.services.ai.azure.com/openai/v1",
+    "AZURE_OPENAI_MODEL": "gpt-5.5"
+  }
+}

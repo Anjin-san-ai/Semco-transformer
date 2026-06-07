@@ -1,0 +1,26 @@
+# Node / Functions
+node_modules/
+api/node_modules/
+.func/
+bin/
+obj/
+local.settings.json
+
+# Build/output
+dist/
+build/
+.azure/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Test artifacts (kept out of git; local-only)
+.playwright-mcp/
+*.png
+!Cognizantlogo.png
+
+# Heavy assets — served from Azure Blob Storage instead of the SWA bundle
+transformer.glb
+*.glb
