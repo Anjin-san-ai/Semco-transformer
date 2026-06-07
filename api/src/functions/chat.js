@@ -29,71 +29,85 @@ app.http('chat', {
   authLevel: 'anonymous',
   route: 'chat',
   handler: async (request, context) => {
-    if (!process.env.AZURE_OPENAI_KEY) {
-      context.log.error('AZURE_OPENAI_KEY application setting is missing.');
+    try {
+      if (!process.env.AZURE_OPENAI_KEY) {
+        context.error('AZURE_OPENAI_KEY application setting is missing.');
+        return {
+          status: 500,
+          jsonBody: { error: 'Server not configured: AZURE_OPENAI_KEY is missing in SWA Application Settings.' },
+        };
+      }
+
+      let payload;
+      try {
+        payload = await request.json();
+      } catch (_) {
+        return { status: 400, jsonBody: { error: 'Invalid JSON body.' } };
+      }
+
+      const userMessages = Array.isArray(payload?.messages) ? payload.messages : null;
+      if (!userMessages || userMessages.length === 0) {
+        return { status: 400, jsonBody: { error: '`messages` array is required.' } };
+      }
+
+      const maxTokens = Number.isFinite(payload?.max_completion_tokens)
+        ? Math.min(payload.max_completion_tokens, 2048)
+        : 1024;
+
+      const body = JSON.stringify({
+        model: MODEL_ID,
+        max_completion_tokens: maxTokens,
+        stream: true,
+        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...userMessages],
+      });
+
+      let upstream;
+      try {
+        upstream = await fetch(AZURE_ENDPOINT.replace(/\/$/, '') + '/chat/completions', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'api-key': process.env.AZURE_OPENAI_KEY,
+          },
+          body,
+        });
+      } catch (err) {
+        context.error('Upstream fetch failed:', err && err.message);
+        return {
+          status: 502,
+          jsonBody: { error: 'Upstream Azure OpenAI request failed.', detail: String(err && err.message || err) },
+        };
+      }
+
+      if (!upstream.ok) {
+        const errText = await upstream.text().catch(() => '');
+        context.error(`Azure OpenAI HTTP ${upstream.status}: ${errText.slice(0, 500)}`);
+        return {
+          status: upstream.status,
+          jsonBody: { error: `Azure OpenAI returned ${upstream.status}.`, detail: errText.slice(0, 500) },
+        };
+      }
+
+      // Stream the SSE response back to the browser. The frontend parser
+      // already understands OpenAI SSE chunks.
+      return {
+        status: 200,
+        headers: {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-cache, no-transform',
+          'x-accel-buffering': 'no',
+        },
+        body: upstream.body,
+      };
+    } catch (err) {
+      // Catch-all so the browser sees a structured error instead of an
+      // empty 500 from the runtime.
+      const msg = (err && err.stack) ? err.stack : String(err);
+      context.error('Unhandled error in /api/chat:', msg);
       return {
         status: 500,
-        jsonBody: { error: 'Server is not configured: AZURE_OPENAI_KEY missing.' },
+        jsonBody: { error: 'Unhandled error in /api/chat.', detail: msg.slice(0, 800) },
       };
     }
-
-    let payload;
-    try {
-      payload = await request.json();
-    } catch (_) {
-      return { status: 400, jsonBody: { error: 'Invalid JSON body.' } };
-    }
-
-    const userMessages = Array.isArray(payload?.messages) ? payload.messages : null;
-    if (!userMessages || userMessages.length === 0) {
-      return { status: 400, jsonBody: { error: '`messages` array is required.' } };
-    }
-
-    const maxTokens = Number.isFinite(payload?.max_completion_tokens)
-      ? Math.min(payload.max_completion_tokens, 2048)
-      : 1024;
-
-    const body = JSON.stringify({
-      model: MODEL_ID,
-      max_completion_tokens: maxTokens,
-      stream: true,
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...userMessages],
-    });
-
-    let upstream;
-    try {
-      upstream = await fetch(AZURE_ENDPOINT.replace(/\/$/, '') + '/chat/completions', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'api-key': process.env.AZURE_OPENAI_KEY,
-        },
-        body,
-      });
-    } catch (err) {
-      context.log.error('Upstream fetch failed:', err);
-      return { status: 502, jsonBody: { error: 'Upstream Azure OpenAI request failed.' } };
-    }
-
-    if (!upstream.ok) {
-      const errText = await upstream.text().catch(() => '');
-      context.log.error(`Azure OpenAI HTTP ${upstream.status}: ${errText.slice(0, 500)}`);
-      return {
-        status: upstream.status,
-        jsonBody: { error: `Azure OpenAI returned ${upstream.status}.`, detail: errText.slice(0, 500) },
-      };
-    }
-
-    // Stream the SSE response straight back to the browser. The frontend
-    // parser (in index.html) already understands OpenAI SSE chunks.
-    return {
-      status: 200,
-      headers: {
-        'content-type': 'text/event-stream; charset=utf-8',
-        'cache-control': 'no-cache, no-transform',
-        'x-accel-buffering': 'no',
-      },
-      body: upstream.body,
-    };
   },
 });
