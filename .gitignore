@@ -15,6 +15,7 @@ build/
 .vscode/
 .idea/
 .DS_Store
+.env
 
 # Test artifacts (kept out of git; local-only)
 .playwright-mcp/

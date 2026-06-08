@@ -1146,7 +1146,7 @@
     // URL is set after we provision the storage account post-deploy; until
     // then production falls back to procedural via the load-error path below.
     const GLB_URL_LOCAL = './transformer.glb';
-    const GLB_URL_REMOTE = ''; // filled in once Blob Storage container is live, e.g. 'https://<account>.blob.core.windows.net/twin/transformer.glb'
+    const GLB_URL_REMOTE = 'https://transformersemco.blob.core.windows.net/models/transformer.glb';
     function loadGLB() {
       const loader = new GLTFLoader();
       const url = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')

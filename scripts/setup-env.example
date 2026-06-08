@@ -1,0 +1,15 @@
+# Copy to .env in the repo root and fill in values. Never commit .env.
+#
+#   cp scripts/setup-env.example .env
+
+AZURE_OPENAI_KEY=
+AZURE_OPENAI_ENDPOINT=https://54138-molqi33i-eastus2.services.ai.azure.com/openai/v1
+AZURE_OPENAI_MODEL=gpt-5.5
+
+AZURE_STORAGE_ACCOUNT=transformersemco
+AZURE_STORAGE_CONTAINER=models
+AZURE_STORAGE_RESOURCE_GROUP=DSEI_DEV
+
+SWA_NAME=Semcotransformer
+SWA_RESOURCE_GROUP=DSEI_DEV
+SWA_URL=https://calm-smoke-050fb9a0f.7.azurestaticapps.net
